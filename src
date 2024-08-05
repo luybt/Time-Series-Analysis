@@ -1,0 +1,101 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.arima.model import ARIMA
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+import requests
+from io import BytesIO
+
+# URL do arquivo CSV
+url = "https://drive.google.com/uc?export=download&id=1bCfacYCzpkP3P0wYQWDgdfs6pT0uQCma"
+
+# Função para baixar o arquivo e carregar como DataFrame
+def load_data(url):
+    print("Baixando o arquivo CSV...")
+    response = requests.get(url)
+    if response.status_code == 200:
+        print("Carregando os dados...")
+        csv_data = BytesIO(response.content)
+        df = pd.read_csv(csv_data)
+        return df
+    else:
+        print("Erro ao baixar o arquivo.")
+        return None
+
+# Carregamento e Pré-processamento de Dados
+df = load_data(url)
+
+# Se o DataFrame foi carregado com sucesso
+if df is not None:
+    print("Convertendo a coluna 'Date' para formato datetime...")
+    df['Date'] = pd.to_datetime(df['Date'])
+    df.set_index('Date', inplace=True)
+    print("Reamostrando os dados para frequência diária...")
+    df = df.resample('D').mean()
+
+    # Visualização dos Dados
+    plt.figure(figsize=(10, 6))
+    plt.plot(df.index, df['Close'], label='Preço de Fechamento')
+    plt.title('Preços das Ações da Walmart')
+    plt.xlabel('Data')
+    plt.ylabel('Preço de Fechamento')
+    plt.legend()
+    plt.show()
+
+    # Divisão dos Dados em Treinamento e Teste
+    print("Dividindo os dados em conjuntos de treinamento (80%) e teste (20%)...")
+    train_size = int(len(df) * 0.8)
+    train_data, test_data = df.iloc[:train_size], df.iloc[train_size:]
+    print(f"Conjunto de Treinamento: {len(train_data)} amostras")
+    print(f"Conjunto de Teste: {len(test_data)} amostras")
+
+    # Treinamento do Modelo ARIMA
+    print("Treinando o modelo ARIMA com ordem (5, 1, 0)...")
+    model = ARIMA(train_data['Close'], order=(5, 1, 0))
+    try:
+        model_fit = model.fit()
+    except Exception as e:
+        print(f"Erro durante o ajuste do modelo ARIMA: {e}")
+        raise
+
+    # Fazendo Previsões e Calculando o RMSE
+    print("Fazendo previsões para o conjunto de teste...")
+    predictions = model_fit.forecast(steps=len(test_data))
+    predicted_values = predictions
+
+    print("Calculando o erro RMSE...")
+    try:
+        rmse = sqrt(mean_squared_error(test_data['Close'], predicted_values))
+        print(f"RMSE: {rmse}")
+    except ValueError as e:
+        if 'NaN' in str(e):
+            print("Erro: A entrada contém valores NaN. Verifique o tratamento de dados ausentes ou possíveis problemas durante a previsão.")
+        elif 'infinity' in str(e):
+            print("Erro: A entrada contém valores infinitos. Investigar possíveis outliers ou transformações nos dados.")
+        else:
+            print(f"Erro inesperado: {e}")
+
+    # Visualização das Previsões
+    plt.figure(figsize=(10, 6))
+    plt.plot(test_data.index, test_data['Close'], label='Preço Real')
+    plt.plot(test_data.index, predicted_values, color='red', label='Preço Previsto')
+    plt.title('Previsão de Preços das Ações da Walmart')
+    plt.xlabel('Data')
+    plt.ylabel('Preço de Fechamento')
+    plt.legend()
+    plt.show()
+
+    # Insights Adicionais com Observações sobre Investimento:
+    print("\n")
+    print("Insights Adicionais com Observações sobre Investimento:")
+    print("\n")
+    print("Tendência Geral:")
+    print("\n")
+    print("O gráfico de preços das ações da Walmart mostra uma tendência geral de crescimento gradual, queda moderada, estabilização com leves oscilações.")
+    print("\n")
+    print("Exemplo de Descrições para Diferentes Tendências:")
+    print("\n")
+    print("Crescimento Gradual: O gráfico mostra uma tendência de crescimento gradual nos preços das ações da Walmart ao longo do período analisado, com ligeiras flutuações.")
+    print("Queda Moderada: O gráfico indica uma tendência de queda moderada nos preços das ações da Walmart, com alguns períodos de estabilização ou leve recuperação.")
+    print("Estabilização com Leves Oscilações: Os preços das ações da Walmart se estabilizaram em torno de um determinado nível, com leves oscilações para cima e para baixo, indicando um período de relativa estabilidade no mercado.")
